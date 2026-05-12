@@ -17,13 +17,7 @@ clean:
 
 sel4_prefix := $(SEL4_INSTALL_DIR)
 
-# Kernel loader binary artifacts provided by Docker container:
-# - `sel4-kernel-loader`: The loader binary, which expects to have a payload appended later via
-#   binary patch.
-# - `sel4-kernel-loader-add-payload`: CLI which appends a payload to the loader.
-loader_artifacts_dir := $(SEL4_INSTALL_DIR)/bin
-loader := $(loader_artifacts_dir)/sel4-kernel-loader
-loader_cli := $(loader_artifacts_dir)/sel4-kernel-loader-add-payload
+kernel := $(SEL4_INSTALL_DIR)/bin/kernel.elf
 
 app_crate := example
 app := $(build_dir)/$(app_crate).elf
@@ -40,27 +34,24 @@ $(app).intermediate:
 			--artifact-dir $(build_dir) \
 			-p $(app_crate)
 
-image := $(build_dir)/image.elf
+kernel32 := $(BUILD)/kernel32.elf
 
-# Append the payload to the loader using the loader CLI
-$(image): $(app) $(loader) $(loader_cli)
-	$(loader_cli) \
-		--loader $(loader) \
-		--sel4-prefix $(sel4_prefix) \
-		--app $(app) \
-		-o $@
+$(kernel32):
+	objcopy -O elf32-i386 $(kernel) $@
 
 qemu_cmd := \
-	qemu-system-aarch64 \
-		-machine virt,virtualization=on -cpu cortex-a57 -m size=1G \
+	qemu-system-x86_64 \
+		-cpu Nehalem,-vme,+pdpe1gb,-xsave,-xsaveopt,-xsavec,-fsgsbase,-invpcid,+syscall,+lm,enforce \
+		-m size=512M \
 		-serial mon:stdio \
 		-nographic \
-		-kernel $(image)
+		-kernel $(kernel32) \
+		-initrd $(app)
 
 .PHONY: run
-run: $(image)
+run: $(app) $(kernel32)
 	$(qemu_cmd)
 
 .PHONY: test
-test: test.py $(image)
+test: test.py $(app)
 	python3 $< $(qemu_cmd)

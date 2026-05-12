@@ -11,7 +11,6 @@ RUN apt-get update -q && apt-get install -y --no-install-recommends \
     curl \
     git \
     # for seL4
-    gcc-aarch64-linux-gnu \
     python3-dev \
     python3-venv \
     cmake \
@@ -19,8 +18,7 @@ RUN apt-get update -q && apt-get install -y --no-install-recommends \
     device-tree-compiler \
     libxml2-utils \
     qemu-utils \
-    qemu-system-arm \
-    qemu-efi-aarch64 \
+    qemu-system-x86 \
     ipxe-qemu \
     # for bindgen
     libclang-dev \
@@ -53,34 +51,20 @@ RUN set -eux; \
     export PATH=$(realpath ./pyenv/bin):$PATH; \
     pip install tools/python-deps; \
     cmake \
-        -DCROSS_COMPILER_PREFIX=aarch64-linux-gnu- \
         -DCMAKE_INSTALL_PREFIX=$SEL4_INSTALL_DIR \
-        -DKernelPlatform=qemu-arm-virt \
-        -DKernelArmHypervisorSupport=ON \
+        -DKernelSel4Arch=x86_64 \
+        -DKernelPlatform=pc99 \
+        -DKernelFSGSBase=msr \
+        -DKernelSupportPCID=OFF \
+        -DKernelIOMMU=OFF \
+        -DKernelFPU=FXSAVE \
         -DKernelVerificationBuild=OFF \
-        -DARM_CPU=cortex-a57 \
         -G Ninja \
         -S . \
         -B build; \
     ninja -C build all; \
     ninja -C build install; \
     rm -rf $(pwd);
-
-RUN set -eux; \
-    url="https://github.com/seL4/rust-sel4"; \
-    rev="2c9786744900433f37e803c25ab208835a802cf3"; \
-    common_args="--git $url --rev $rev --root $SEL4_INSTALL_DIR"; \
-    CC_aarch64_unknown_none=aarch64-linux-gnu-gcc \
-    SEL4_PREFIX=$SEL4_INSTALL_DIR \
-        cargo install \
-            -Z build-std=core,compiler_builtins \
-            -Z build-std-features=compiler-builtins-mem \
-            --target aarch64-unknown-none \
-            $common_args \
-            sel4-kernel-loader; \
-    cargo install \
-        $common_args \
-        sel4-kernel-loader-add-payload;
 
 ARG UID
 ARG GID
